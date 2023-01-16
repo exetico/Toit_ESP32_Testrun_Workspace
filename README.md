@@ -1,4 +1,4 @@
-# Jaguar
+# Toit & Jaguar - Work in progress (Personal notes)
 
 You've found my personal notes, on how to use the solutions from Toit.io - Jaguar and the toit-lang.
 
