@@ -18,6 +18,14 @@ Point to a SDK like: `https://github.com/toitlang/toit/releases/download/v2.0.0-
 
 Remember to check the [release page](https://github.com/toitlang/toit/releases).
 
+### Linux / Manjaro
+
+`yay install jaguar-bin`
+
+Or use a GUI like `bauh`
+
+Hereafter, remember to run `jag setup`.
+
 ## Jaguar Cheat-sheet
 
 Serial monitor:
