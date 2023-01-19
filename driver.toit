@@ -1,6 +1,27 @@
 import binary
 import serial
 
+
+class SequenceStepEnables:
+  tcc /bool := false
+  msrc /bool := false
+  dss /bool := false
+  pre_range /bool := false
+  final_range /bool := false
+
+class SequenceStepTimeouts:
+  pre_range_vcsel_period_pclks /int := 0
+  final_range_vcsel_period_pclks /int := 0
+
+  msrc_dss_tcc_mclks /int := 0
+  pre_range_mclks /int := 0
+  final_range_mclks /int := 0
+
+  msrc_dss_tcc_us /int := 0
+  pre_range_us /int := 0
+  final_range_us /int := 0
+
+
 class LIDARDistanceSensorVL53L0X:
   static I2C_ADDRESS ::= 0x29
 
@@ -12,11 +33,310 @@ class LIDARDistanceSensorVL53L0X:
   static MSRC_CONFIG_CONTROL ::= 0x60
   static FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT ::= 0x44
 
+  static GLOBAL_CONFIG_SPAD_ENABLES_REF_0            ::= 0xB0
+  static GLOBAL_CONFIG_SPAD_ENABLES_REF_1            ::= 0xB1
+  static GLOBAL_CONFIG_SPAD_ENABLES_REF_2            ::= 0xB2
+  static GLOBAL_CONFIG_SPAD_ENABLES_REF_3            ::= 0xB3
+  static GLOBAL_CONFIG_SPAD_ENABLES_REF_4            ::= 0xB4
+  static GLOBAL_CONFIG_SPAD_ENABLES_REF_5            ::= 0xB5
+
+  static DYNAMIC_SPAD_REF_EN_START_OFFSET ::= 0x4F
+  static DYNAMIC_SPAD_NUM_REQUESTED_REF_SPAD ::= 0x4E
+  static GLOBAL_CONFIG_REF_EN_START_SELECT ::= 0xB6
+
+  static SYSTEM_INTERRUPT_CONFIG_GPIO ::= 0x0A
+  static GPIO_HV_MUX_ACTIVE_HIGH ::= 0x84
+
+  static SYSTEM_INTERRUPT_CLEAR ::= 0x0B
+
+  static ENABLE_DEBUG ::= true
+
+  static io_timeout := 5000 // NOTE_TO_SELF: Should be defined by the user... Right?
+  static spad_count := 0
+  static spad_type_is_aperture := 0
+  static timeout_start_ms /int := 0
+  static stop_variable := 0
+  static spadinfo := 0
+  ref_spad_map := []
+  static spads_enabled /int := 0
+
+
   registers_/serial.Registers
 
   constructor device/serial.Device:
     registers_ = device.registers
 
+
+  checkTimeoutExpired:
+    if io_timeout > 0 and ((Time.now.ms_since_epoch - timeout_start_ms ) > io_timeout):
+      return true;
+    else:
+      return false;
+
+  readMulti reg count:
+    
+    if ENABLE_DEBUG: print "readMulti"
+    
+    registers_.write_u8 reg I2C_ADDRESS
+
+    // NOTE_TO_SELF: Consider refactor this into a while-loop?
+    read1 := registers_.read_u8 reg
+    read2 := registers_.read_u8 GLOBAL_CONFIG_SPAD_ENABLES_REF_1
+    read3 := registers_.read_u8 GLOBAL_CONFIG_SPAD_ENABLES_REF_2
+    read4 := registers_.read_u8 GLOBAL_CONFIG_SPAD_ENABLES_REF_3
+    read5 := registers_.read_u8 GLOBAL_CONFIG_SPAD_ENABLES_REF_4
+    read6 := registers_.read_u8 GLOBAL_CONFIG_SPAD_ENABLES_REF_5
+    
+    ref_spad_map = [read1, read2, read3, read4, read5, read6]
+    if ENABLE_DEBUG:
+      print "readMulti Results"
+      print read1
+      print read2
+      print read3
+      print read4
+      print read5
+      print read6
+    // bus->beginTransmission(address);
+    // bus->write(reg);
+    // last_status = bus->endTransmission();
+
+    // bus->requestFrom(address, count);
+
+    // while (count-- > 0)
+    // {
+    //   *(dst++) = bus->read();
+    // }
+
+  writeMulti reg:
+    // NOTE_TO_SELF Consider whileloop, as in the original file
+    registers_.write_bytes reg ref_spad_map
+
+
+  startTimeout:
+    if ENABLE_DEBUG: print "startTimeout"
+    timeout_start_ms = Time.now.ms_since_epoch
+  
+  getSpadInfo:
+  
+    if ENABLE_DEBUG: print "getSpadInfo"
+
+    tmp := 0
+
+    registers_.write_u8 0x80 0x01
+    registers_.write_u8 0xFF 0x01
+    registers_.write_u8 0x00 0x00
+
+    registers_.write_u8 0xFF 0x06
+
+    readed0x83_No1 := registers_.read_u8 0x83
+    print " "
+    print "readed0x83_No1"
+    print readed0x83_No1
+    print " "
+    registers_.write_u8 0x83 (readed0x83_No1 | 0x04)
+    registers_.write_u8 0xFF 0x07
+    registers_.write_u8 0x81 0x01
+
+    registers_.write_u8 0x80 0x01
+
+    registers_.write_u8 0x94 0x6b
+    registers_.write_u8 0x83 0x00
+
+    startTimeout
+
+    while (registers_.read_u8 0x83) == 0x00:
+      if checkTimeoutExpired:
+        return false;
+
+    registers_.write_u8 0x83 0x01
+
+    tmp = registers_.read_u8 0x92
+    print [spad_count, tmp, tmp & 0x7f, 0x7f]
+    spad_count = tmp & 0x7f;
+    print [spad_count, tmp, tmp & 0x7f, 0x7f]
+  
+    spad_type_is_aperture = (tmp >> 7) & 0x01;
+
+    registers_.write_u8 0x81 0x00
+    registers_.write_u8 0xFF 0x06
+
+    readed0x83_No2 := registers_.read_u8 0x83
+
+    if ENABLE_DEBUG:
+
+      print " "
+      print "tmp"
+      print tmp
+      print "spad_count"
+      print spad_count
+      print "spad_type_is_aperture"
+      print spad_type_is_aperture
+      print " "
+
+    registers_.write_u8 0x83 readed0x83_No2  & ~0x04
+    registers_.write_u8 0xFF 0x01
+    registers_.write_u8 0x00 0x01
+
+    registers_.write_u8 0xFF 0x00
+    registers_.write_u8 0x80 0x00
+
+    return true
+    
+
+
+  getVcselPulsePeriod vcselPeriodType:
+    print "Things is not working here... How to handle this?"
+    print "https://github.com/pololu/vl53l0x-arduino/blob/9f3773cb48d4e4e844d689cfc529a06f96d1d264/VL53L0X.cpp#L742"
+    if type == VcselPeriodPreRange:
+    
+      return decodeVcselPeriod(readReg(PRE_RANGE_CONFIG_VCSEL_PERIOD))
+    else if type == VcselPeriodFinalRange:
+      return decodeVcselPeriod(readReg(FINAL_RANGE_CONFIG_VCSEL_PERIOD));
+    else: return 255; 
+
+  getSequenceStepEnables enables:
+    sequence_config := registers_.read_u8 SYSTEM_SEQUENCE_CONFIG;
+
+    enables.tcc          = (sequence_config >> 4) & 0x1 ? true : false;
+    enables.dss          = (sequence_config >> 3) & 0x1 ? true : false;
+    enables.msrc         = (sequence_config >> 2) & 0x1 ? true : false;
+    enables.pre_range    = (sequence_config >> 6) & 0x1 ? true : false;
+    enables.final_range  = (sequence_config >> 7) & 0x1 ? true : false;
+
+    return enables
+
+  getSequenceStepTimeouts enables timeouts:
+
+    timeouts.pre_range_vcsel_period_pclks = getVcselPulsePeriod(VcselPeriodPreRange);
+
+  /*
+    timeouts->msrc_dss_tcc_mclks = readReg(MSRC_CONFIG_TIMEOUT_MACROP) + 1;
+    timeouts->msrc_dss_tcc_us =
+      timeoutMclksToMicroseconds(timeouts->msrc_dss_tcc_mclks,
+                                timeouts->pre_range_vcsel_period_pclks);
+
+    timeouts->pre_range_mclks =
+      decodeTimeout(readReg16Bit(PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI));
+    timeouts->pre_range_us =
+      timeoutMclksToMicroseconds(timeouts->pre_range_mclks,
+                                timeouts->pre_range_vcsel_period_pclks);
+
+    timeouts->final_range_vcsel_period_pclks = getVcselPulsePeriod(VcselPeriodFinalRange);
+
+    timeouts->final_range_mclks =
+      decodeTimeout(readReg16Bit(FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI));
+
+    if (enables->pre_range)
+    {
+      timeouts->final_range_mclks -= timeouts->pre_range_mclks;
+    }
+
+    timeouts->final_range_us =
+      timeoutMclksToMicroseconds(timeouts->final_range_mclks,
+                                timeouts->final_range_vcsel_period_pclks);
+  }
+
+  // Decode sequence step timeout in MCLKs from register value
+  // based on VL53L0X_decode_timeout()
+  // Note: the original function returned a uint32_t, but the return value is
+  // always stored in a uint16_t.
+  uint16_t VL53L0X::decodeTimeout(uint16_t reg_val)
+  {
+    // format: "(LSByte * 2^MSByte) + 1"
+    return (uint16_t)((reg_val & 0x00FF) <<
+          (uint16_t)((reg_val & 0xFF00) >> 8)) + 1;
+  }
+
+  // Encode sequence step timeout register value from timeout in MCLKs
+  // based on VL53L0X_encode_timeout()
+  uint16_t VL53L0X::encodeTimeout(uint32_t timeout_mclks)
+  {
+    // format: "(LSByte * 2^MSByte) + 1"
+
+    uint32_t ls_byte = 0;
+    uint16_t ms_byte = 0;
+
+    if (timeout_mclks > 0)
+    {
+      ls_byte = timeout_mclks - 1;
+
+      while ((ls_byte & 0xFFFFFF00) > 0)
+      {
+        ls_byte >>= 1;
+        ms_byte++;
+      }
+
+      return (ms_byte << 8) | (ls_byte & 0xFF);
+    }
+    else { return 0; }
+    */
+
+
+  getMeasurementTimingBudget:
+    if ENABLE_DEBUG: print "getMeasurementTimingBudget"
+
+    enables := SequenceStepEnables
+    timeouts := SequenceStepTimeouts
+
+    startOverhead     := 1910
+    endOverhead        := 960
+    msrcOverhead       := 660
+    tccOverhead        := 590
+    dssOverhead        := 690
+    preRangeOverhead   := 660
+    finalRangeOverhead := 550
+
+    // "Start and end overhead times always present"
+    budget_us := startOverhead + endOverhead;
+
+    print "B1"
+    print enables.tcc
+    print enables.dss
+    print enables.msrc
+    print enables.pre_range
+    print enables.final_range
+    
+    enables = getSequenceStepEnables enables
+
+    if ENABLE_DEBUG:
+      print "enables values:"
+      print [enables.tcc, enables.dss, enables.msrc, enables.pre_range, enables.final_range]
+
+
+    timeouts = getSequenceStepTimeouts &enables &timeouts
+
+    print "USER_NOTE: This is the end.. Work in progress"
+
+    return true
+
+    // if (enables.tcc)
+    // {
+    //   budget_us += (timeouts.msrc_dss_tcc_us + TccOverhead);
+    // }
+
+    // if (enables.dss)
+    // {
+    //   budget_us += 2 * (timeouts.msrc_dss_tcc_us + DssOverhead);
+    // }
+    // else if (enables.msrc)
+    // {
+    //   budget_us += (timeouts.msrc_dss_tcc_us + MsrcOverhead);
+    // }
+
+    // if (enables.pre_range)
+    // {
+    //   budget_us += (timeouts.pre_range_us + PreRangeOverhead);
+    // }
+
+    // if (enables.final_range)
+    // {
+    //   budget_us += (timeouts.final_range_us + FinalRangeOverhead);
+    // }
+
+    // measurement_timing_budget_us = budget_us; // store for internal reuse
+    // return budget_us;
+    
+    
   on:
     print "Test1"
 
@@ -29,7 +349,7 @@ class LIDARDistanceSensorVL53L0X:
     registers_.write_u8 0x80 0x01
     registers_.write_u8 0xFF 0x01
     registers_.write_u8 0x00 0x00
-    stop_variable := registers_.read_u8 0x91
+    stop_variable = registers_.read_u8 0x91
     registers_.write_u8 0x00 0x01
     registers_.write_u8 0xFF 0x00
     registers_.write_u8 0x80 0x00
@@ -46,7 +366,179 @@ class LIDARDistanceSensorVL53L0X:
 
     registers_.write_u8 SYSTEM_SEQUENCE_CONFIG 0xFF;
 
-    // Not finished
+
+    spadinfo:= getSpadInfo
+
+    if not spadinfo:
+      return false;
+    else if ENABLE_DEBUG:
+      print "Init: spadinfo recieved"
+
+
+
+    // The SPAD map (RefGoodSpadMap) is read by VL53L0X_get_info_from_device() in
+    // the API, but the same data seems to be more easily readable from
+    // GLOBAL_CONFIG_SPAD_ENABLES_REF_0 through _6, so read it from there
+
+    readMulti GLOBAL_CONFIG_SPAD_ENABLES_REF_0 6
+
+
+    // -- VL53L0X_set_reference_spads() begin (assume NVM values are valid)
+    registers_.write_u8 0xFF 0x01
+    registers_.write_u8 DYNAMIC_SPAD_REF_EN_START_OFFSET 0x00
+    registers_.write_u8 DYNAMIC_SPAD_NUM_REQUESTED_REF_SPAD 0x2C
+    registers_.write_u8 0xFF 0x00
+    registers_.write_u8 GLOBAL_CONFIG_REF_EN_START_SELECT 0xB4
+
+    // NOTE_TO_SELF: spad_type_is_aperture ... Should that have been defined/set at some point? It looks like it's define at getSpadInfo
+    first_spad_to_enable := spad_type_is_aperture ? 12 : 0; // 12 is the first aperture spad
+    print "KO"
+    print spad_type_is_aperture
+
+    whileMax := 48
+    wC := 0
+
+    while wC < whileMax and wC < ref_spad_map.size:
+      if wC < first_spad_to_enable or spads_enabled == spad_count:
+        // This bit is lower than the first one that should be enabled, or
+        // (reference_spad_count) bits have already been enabled, so zero this bit
+
+        //print ref_spad_map
+        //print ref_spad_map[wC]/8
+        //print ["Test", spads_enabled]
+        //print spad_count
+
+        ref_spad_map[wC / 8] = ref_spad_map[wC / 8] ? ref_spad_map[wC / 8] : ~(1 << (wC % 8))
+      else if ((ref_spad_map[wC / 8] >> (wC % 8)) and 0x1):
+        spads_enabled = spads_enabled +1
+
+      print wC < whileMax
+      wC = wC + 1
+
+    writeMulti GLOBAL_CONFIG_SPAD_ENABLES_REF_0
+
+    // -- VL53L0X_set_reference_spads() end
+
+    // -- VL53L0X_load_tuning_settings() begin
+    // DefaultTuningSettings from vl53l0x_tuning.h
+
+
+
+    registers_.write_u8 0xFF 0x01
+    registers_.write_u8 0x00 0x00
+
+    registers_.write_u8 0xFF 0x00
+    registers_.write_u8 0x09 0x00
+    registers_.write_u8 0x10 0x00
+    registers_.write_u8 0x11 0x00
+
+    registers_.write_u8 0x24 0x01
+    registers_.write_u8 0x25 0xFF
+    registers_.write_u8 0x75 0x00
+
+    registers_.write_u8 0xFF 0x01
+    registers_.write_u8 0x4E 0x2C
+    registers_.write_u8 0x48 0x00
+    registers_.write_u8 0x30 0x20
+
+    registers_.write_u8 0xFF 0x00
+    registers_.write_u8 0x30 0x09
+    registers_.write_u8 0x54 0x00
+    registers_.write_u8 0x31 0x04
+    registers_.write_u8 0x32 0x03
+    registers_.write_u8 0x40 0x83
+    registers_.write_u8 0x46 0x25
+    registers_.write_u8 0x60 0x00
+    registers_.write_u8 0x27 0x00
+    registers_.write_u8 0x50 0x06
+    registers_.write_u8 0x51 0x00
+    registers_.write_u8 0x52 0x96
+    registers_.write_u8 0x56 0x08
+    registers_.write_u8 0x57 0x30
+    registers_.write_u8 0x61 0x00
+    registers_.write_u8 0x62 0x00
+    registers_.write_u8 0x64 0x00
+    registers_.write_u8 0x65 0x00
+    registers_.write_u8 0x66 0xA0
+
+    registers_.write_u8 0xFF 0x01
+    registers_.write_u8 0x22 0x32
+    registers_.write_u8 0x47 0x14
+    registers_.write_u8 0x49 0xFF
+    registers_.write_u8 0x4A 0x00
+
+    registers_.write_u8 0xFF 0x00
+    registers_.write_u8 0x7A 0x0A
+    registers_.write_u8 0x7B 0x00
+    registers_.write_u8 0x78 0x21
+
+    registers_.write_u8 0xFF 0x01
+    registers_.write_u8 0x23 0x34
+    registers_.write_u8 0x42 0x00
+    registers_.write_u8 0x44 0xFF
+    registers_.write_u8 0x45 0x26
+    registers_.write_u8 0x46 0x05
+    registers_.write_u8 0x40 0x40
+    registers_.write_u8 0x0E 0x06
+    registers_.write_u8 0x20 0x1A
+    registers_.write_u8 0x43 0x40
+
+    registers_.write_u8 0xFF 0x00
+    registers_.write_u8 0x34 0x03
+    registers_.write_u8 0x35 0x44
+
+    registers_.write_u8 0xFF 0x01
+    registers_.write_u8 0x31 0x04
+    registers_.write_u8 0x4B 0x09
+    registers_.write_u8 0x4C 0x05
+    registers_.write_u8 0x4D 0x04
+
+    registers_.write_u8 0xFF 0x00
+    registers_.write_u8 0x44 0x00
+    registers_.write_u8 0x45 0x20
+    registers_.write_u8 0x47 0x08
+    registers_.write_u8 0x48 0x28
+    registers_.write_u8 0x67 0x00
+    registers_.write_u8 0x70 0x04
+    registers_.write_u8 0x71 0x01
+    registers_.write_u8 0x72 0xFE
+    registers_.write_u8 0x76 0x00
+    registers_.write_u8 0x77 0x00
+
+    registers_.write_u8 0xFF 0x01
+    registers_.write_u8 0x0D 0x01
+
+    registers_.write_u8 0xFF 0x00
+    registers_.write_u8 0x80 0x01
+    registers_.write_u8 0x01 0xF8
+
+    registers_.write_u8 0xFF 0x01
+    registers_.write_u8 0x8E 0x01
+    registers_.write_u8 0x00 0x01
+    registers_.write_u8 0xFF 0x00
+    registers_.write_u8 0x80 0x00
+
+
+    // -- VL53L0X_load_tuning_settings() end
+
+    // "Set interrupt config to new sample ready"
+    // -- VL53L0X_SetGpioConfig() begin
+
+    registers_.write_u8 SYSTEM_INTERRUPT_CONFIG_GPIO 0x04
+    readMuxActiveHighVal := registers_.read_u8 GPIO_HV_MUX_ACTIVE_HIGH
+    registers_.write_u8 GPIO_HV_MUX_ACTIVE_HIGH  (readMuxActiveHighVal & ~0x10) // active low
+    registers_.write_u8 SYSTEM_INTERRUPT_CLEAR  0x01
+    // -- VL53L0X_SetGpioConfig() end
+
+
+    measurement_timing_budget_us := getMeasurementTimingBudget
+
+
+
+
+
+    return true
+
 
   off:
 
