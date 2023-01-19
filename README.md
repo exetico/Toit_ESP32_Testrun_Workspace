@@ -31,6 +31,11 @@ Hereafter, remember to run `jag setup`.
 Serial monitor:
 `jag monitor --attach`
 
+### Flash ESP32
+
+Flash ESP32 with:
+`jag flash`
+
 ### Containers
 
 Install container:
