@@ -13,6 +13,7 @@ You're more than welcome to create a PR, if you have any suggestions on how to b
 **Toit standard libraries**: [https://libs.toit.io/](https://libs.toit.io/)
 **Toit language basics**: [https://docs.toit.io/language](https://docs.toit.io/language)
 **Toit project examples**: [https://github.com/toitlang/toit/tree/master/examples](https://github.com/toitlang/toit/tree/master/examples)
+**Toit standard libraries - serial**: [https://libs.toit.io/serial/registers/class-Registers](https://libs.toit.io/serial/registers/class-Registers)
 
 ## Install
 
