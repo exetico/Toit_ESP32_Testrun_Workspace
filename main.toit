@@ -13,8 +13,11 @@ main:
   distance_sensor := LIDARDistanceSensorVL53L0X device
 
   distance_sensor.on
-  distance_sensor.startContinuous
+
+  // NOTE_TO_SELF: Make "period_ms" parameter optional?
+  distance_sensor.startContinuous false // false, just to provide something
   while true:
+
     print "$distance_sensor.horizontal"
         + "(pressed: $distance_sensor.horizontal)"
     sleep --ms=250
