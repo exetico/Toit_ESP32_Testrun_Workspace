@@ -759,6 +759,25 @@ class LIDARDistanceSensorVL53L0X:
       // continuous back-to-back mode
       registers_.write_u8 SYSRANGE_START 0x02 // VL53L0X_REG_SYSRANGE_MODE_BACKTOBACK
 
+  readRangeContinuousMillimeters:
+    startTimeout
+
+    did_timeout := false
+
+    while (((registers_.read_u8 RESULT_INTERRUPT_STATUS) & 0x07) == 0):
+      if (checkTimeoutExpired):
+        did_timeout = true
+        return 65535;
+
+    // assumptions: Linearity Corrective Gain is 1000 (default);
+    // fractional ranging is not enabled
+    range := registers_.read_u16_le RESULT_RANGE_STATUS + 10;
+
+    registers_.write_u8 SYSTEM_INTERRUPT_CLEAR 0x01
+
+    return range;
+
+
   off:
 
   /**

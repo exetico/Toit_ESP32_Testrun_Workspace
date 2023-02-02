@@ -15,9 +15,9 @@ main:
   distance_sensor.on
 
   // NOTE_TO_SELF: Make "period_ms" parameter optional?
-  distance_sensor.startContinuous false // false, just to provide something
+  distance_sensor.startContinuous 0 // false, just to provide something
   while true:
-
-    print "$distance_sensor.horizontal"
-        + "(pressed: $distance_sensor.horizontal)"
-    sleep --ms=250
+    print distance_sensor.readRangeContinuousMillimeters
+    // print "$distance_sensor.horizontal"
+        // + "(pressed: $distance_sensor.horizontal)"
+    sleep --ms=500
