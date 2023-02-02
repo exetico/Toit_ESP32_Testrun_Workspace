@@ -1,3 +1,10 @@
+// Original C++ Solution: https://github.com/pololu/vl53l0x-arduino
+// 
+// This is a re-written VL53l0x driver for the To.it language
+// 
+// Therefore I'll give all credits to the original writer of pololu/vl53l0x-arduino
+// For both structure of the code, binary-usage and "how to"
+
 import binary
 import serial
 
