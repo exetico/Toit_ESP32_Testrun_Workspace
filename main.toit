@@ -41,6 +41,20 @@ main:
     // ... So i'm not really sure here... It's pretty close, but still.. It' must be something in the handling of the readout... Or calibration...
     // Or... is it?
 
+    /*
+    CM  Readout RO/CM
+    22	61440   2792,72727272727
+    20	56832   2841,6
+    15	43000   2866,66666666667
+    10	29000   2900
+    7	  20224   2889,14285714286
+    5	  15616   3123,2
+    2	  8900    4450
+
+    After 23cm~ (65024 RO) it's starting over in the readouts~. So 26cm = 13057 (65024~ + 13057)
+    */
+
+
     // WORK IN PROGRESS - END
 
     print "$distance_sensor.readRangeContinuousMillimeters"
