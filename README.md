@@ -2,7 +2,7 @@
 
 You've found my personal notes, on how to use the solutions from Toit.io - Jaguar and the toit-lang.
 
-## Work in progress
+## VL53L0X Driver - Work in progress
 
 This project is currently in a "work in progress" state. It's somewhat working, but finetuning and clean must be done, before this should be used in a final product.
 
