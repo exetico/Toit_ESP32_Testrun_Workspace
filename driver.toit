@@ -28,8 +28,10 @@ class VL53L0X:
   VcselPeriodFinalRange /int := 10
 
 class LIDARDistanceSensorVL53L0X:
-  static I2C_ADDRESS ::= 0x29
+  static ENABLE_DEBUG ::= true
+  static VERBOSE_DEBUG ::= false
 
+  static I2C_ADDRESS ::= 0x29
 
   static SYSRANGE_START ::= 0x00
 
@@ -73,8 +75,6 @@ class LIDARDistanceSensorVL53L0X:
 
   static MSRC_CONFIG_TIMEOUT_MACROP ::= 0x46 
 
-  static ENABLE_DEBUG ::= true
-  static VERBOSE_DEBUG ::= true
 
   static io_timeout := 5000 // NOTE_TO_SELF: Should be defined by the user... Right?
   static spad_count := 0
