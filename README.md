@@ -2,6 +2,12 @@
 
 You've found my personal notes, on how to use the solutions from Toit.io - Jaguar and the toit-lang.
 
+## Work in progress
+
+This project is currently in a "work in progress" state. It's somewhat working, but finetuning and clean must be done, before this should be used in a final product.
+
+You're more than welcome to create a PR, if you have any suggestions on how to both improve, refactor an optimize the current solution, or maybe even "tune" the settings and calibration for the VL53L0X.
+
 ## Links
 
 **Toit standard libraries**: [https://libs.toit.io/](https://libs.toit.io/)
