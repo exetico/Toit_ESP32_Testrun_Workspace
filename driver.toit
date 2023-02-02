@@ -673,6 +673,12 @@ class LIDARDistanceSensorVL53L0X:
     // "Recalculate timing budget"
     setMeasurementTimingBudget measurement_timing_budget_us
 
+    // VL53L0X_StaticInit() end
+
+    // VL53L0X_PerformRefCalibration() begin (VL53L0X_perform_ref_calibration())
+
+    // -- VL53L0X_perform_vhv_calibration() begin
+
     print "You're right here... Go fix"
 
 
