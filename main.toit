@@ -18,6 +18,9 @@ main:
   distance_sensor.startContinuous 0 // false, just to provide something
   while true:
 
+    // WORK IN PROGRESS - START
+
+    // NOTE_TO_SELF
     // Measurement looks more like inches, but still not 1:1...
     
     // I guess it's related to how I handle the "enabled" options and more, so more debugging is still needed.
@@ -30,8 +33,17 @@ main:
 
     // So ... Well ... Maybe it's just the configuration, initial calibration or similar ...
 
-    //
-    print distance_sensor.readRangeContinuousMillimeters
-    // print "$distance_sensor.horizontal"
-        // + "(pressed: $distance_sensor.horizontal)"
+    // What about inches to cm? ... 1 inch is 2.54 cm...
+    // 20 cm position = 56832 readout * 0.39 = 22.16
+    // 10cm position = 29000 readout * 0.39 = 11.31
+    // 5cm position = 15616 readout * 0.39 = 6.09
+    // 2cm position = 8900 readout * 0.39 = 3.471
+    // ... So i'm not really sure here... It's pretty close, but still.. It' must be something in the handling of the readout... Or calibration...
+    // Or... is it?
+
+    // WORK IN PROGRESS - END
+
+    print "$distance_sensor.readRangeContinuousMillimeters"
+
+    // print "$distance_sensor.horizontal" + "(pressed: $distance_sensor.horizontal)"
     sleep --ms=250
