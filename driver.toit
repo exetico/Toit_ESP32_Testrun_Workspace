@@ -74,6 +74,7 @@ class LIDARDistanceSensorVL53L0X:
   static MSRC_CONFIG_TIMEOUT_MACROP ::= 0x46 
 
   static ENABLE_DEBUG ::= true
+  static VERBOSE_DEBUG ::= true
 
   static io_timeout := 5000 // NOTE_TO_SELF: Should be defined by the user... Right?
   static spad_count := 0
@@ -137,7 +138,7 @@ class LIDARDistanceSensorVL53L0X:
 
 
   startTimeout:
-    if ENABLE_DEBUG: print "startTimeout"
+    if VERBOSE_DEBUG: print "startTimeout"
     timeout_start_ms = Time.now.ms_since_epoch
   
   getSpadInfo:
