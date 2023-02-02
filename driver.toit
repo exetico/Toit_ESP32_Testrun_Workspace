@@ -356,34 +356,23 @@ class LIDARDistanceSensorVL53L0X:
 
     timeouts = getSequenceStepTimeouts enables timeouts
 
-    print "USER_NOTE: This is the end.. Work in progress"
-
-    return true
-
-
-
-    // if (enables.dss)
-    // {
-    //   budget_us += 2 * (timeouts.msrc_dss_tcc_us + DssOverhead);
-    // }
-    // else if (enables.msrc)
-    // {
-    //   budget_us += (timeouts.msrc_dss_tcc_us + MsrcOverhead);
-    // }
-
-    // if (enables.pre_range)
-    // {
-    //   budget_us += (timeouts.pre_range_us + PreRangeOverhead);
-    // }
-
-    // if (enables.final_range)
-    // {
-    //   budget_us += (timeouts.final_range_us + FinalRangeOverhead);
-    // }
-
-    // measurement_timing_budget_us = budget_us; // store for internal reuse
-    // return budget_us;
+    if enables.dss:
+      budget_us += 2 * (timeouts.msrc_dss_tcc_us + dssOverhead);
+    else if enables.msrc:
+     budget_us += (timeouts.msrc_dss_tcc_us + msrcOverhead);
     
+    
+    if enables.pre_range:
+     budget_us += (timeouts.pre_range_us + preRangeOverhead);
+
+    if enables.final_range:
+     budget_us += (timeouts.final_range_us + finalRangeOverhead);
+
+    // measurement_timing_budget_us = budget_us;
+
+    return budget_us
+
+
     
   on:
     print "Test1"
