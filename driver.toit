@@ -3,11 +3,11 @@ import serial
 
 
 class SequenceStepEnables:
-  tcc /bool := false
-  msrc /bool := false
-  dss /bool := false
-  pre_range /bool := false
-  final_range /bool := false
+  tcc /int := 0
+  msrc /int := 0
+  dss /int := 0
+  pre_range /int := 0
+  final_range /int := 0
 
 class SequenceStepTimeouts:
   pre_range_vcsel_period_pclks /int := 0
@@ -21,6 +21,11 @@ class SequenceStepTimeouts:
   pre_range_us /int := 0
   final_range_us /int := 0
 
+
+class VL53L0X:
+  // Long Range = PR 18, FR 14
+  VcselPeriodPreRange /int := 14
+  VcselPeriodFinalRange /int := 10
 
 class LIDARDistanceSensorVL53L0X:
   static I2C_ADDRESS ::= 0x29
@@ -48,6 +53,16 @@ class LIDARDistanceSensorVL53L0X:
   static GPIO_HV_MUX_ACTIVE_HIGH ::= 0x84
 
   static SYSTEM_INTERRUPT_CLEAR ::= 0x0B
+
+  static PRE_RANGE_CONFIG_VCSEL_PERIOD ::= 0x50
+  static PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI ::= 0x51
+
+
+  static FINAL_RANGE_CONFIG_VCSEL_PERIOD ::= 0x70
+  static FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI ::= 0x71
+
+
+  static MSRC_CONFIG_TIMEOUT_MACROP ::= 0x46 
 
   static ENABLE_DEBUG ::= true
 
@@ -183,70 +198,94 @@ class LIDARDistanceSensorVL53L0X:
     return true
     
 
+  decodeVcselPeriod reg_val:
+    // Bit Shift, Left Direction
+    // 6 would be 14
+
+    // Explainers below...
+    // Number Base: Octal (8)
+    // Number: 6
+    // Shift Direction: << Left
+    // Bits to Shift: 1
+    //
+    // Decimal: 12
+    // Binary: 1100
+    // Hexadecimal: c
+    // Octal: 14 
+    return ((reg_val) + 1) << 1
+
+  calcMacroPeriod vcsel_period_pclks:
+    return (((2304 * (vcsel_period_pclks) * 1655) + 500) / 1000)
+
+
+  timeoutMclksToMicroseconds timeout_period_mclks vcsel_period_pclks:
+      macro_period_ns := calcMacroPeriod vcsel_period_pclks;
+
+      return ((timeout_period_mclks * macro_period_ns) + 500) / 1000;
+
 
   getVcselPulsePeriod vcselPeriodType:
     print "Things is not working here... How to handle this?"
     print "https://github.com/pololu/vl53l0x-arduino/blob/9f3773cb48d4e4e844d689cfc529a06f96d1d264/VL53L0X.cpp#L742"
-    if type == VcselPeriodPreRange:
     
-      return decodeVcselPeriod(readReg(PRE_RANGE_CONFIG_VCSEL_PERIOD))
-    else if type == VcselPeriodFinalRange:
-      return decodeVcselPeriod(readReg(FINAL_RANGE_CONFIG_VCSEL_PERIOD));
-    else: return 255; 
+    p /VL53L0X? := null
+    p = VL53L0X
+
+    VcselPulsePeriodReturn := null
+
+    if vcselPeriodType == p.VcselPeriodPreRange:
+      PRE_RANGE_CONFIG := registers_.read_u8 PRE_RANGE_CONFIG_VCSEL_PERIOD
+      VcselPulsePeriodReturn = decodeVcselPeriod PRE_RANGE_CONFIG
+
+    else if vcselPeriodType == p.VcselPeriodFinalRange:
+      FINAL_RANGE_CONFIG := registers_.read_u8 FINAL_RANGE_CONFIG_VCSEL_PERIOD
+      VcselPulsePeriodReturn = decodeVcselPeriod FINAL_RANGE_CONFIG
+
+    else: VcselPulsePeriodReturn = 255; 
+
+    return VcselPulsePeriodReturn
 
   getSequenceStepEnables enables:
     sequence_config := registers_.read_u8 SYSTEM_SEQUENCE_CONFIG;
 
-    enables.tcc          = (sequence_config >> 4) & 0x1 ? true : false;
-    enables.dss          = (sequence_config >> 3) & 0x1 ? true : false;
-    enables.msrc         = (sequence_config >> 2) & 0x1 ? true : false;
-    enables.pre_range    = (sequence_config >> 6) & 0x1 ? true : false;
-    enables.final_range  = (sequence_config >> 7) & 0x1 ? true : false;
+    enables.tcc          = (sequence_config >> 4) & 0x1;
+    enables.dss          = (sequence_config >> 3) & 0x1;
+    enables.msrc         = (sequence_config >> 2) & 0x1;
+    enables.pre_range    = (sequence_config >> 6) & 0x1;
+    enables.final_range  = (sequence_config >> 7) & 0x1;
 
     return enables
 
   getSequenceStepTimeouts enables timeouts:
 
-    timeouts.pre_range_vcsel_period_pclks = getVcselPulsePeriod(VcselPeriodPreRange);
+    p /VL53L0X? := null
+    p = VL53L0X
+
+
+    timeouts.pre_range_vcsel_period_pclks = getVcselPulsePeriod p.VcselPeriodPreRange;
+
+    timeouts.msrc_dss_tcc_mclks = (registers_.read_u8 MSRC_CONFIG_TIMEOUT_MACROP) + 1;
+
+    timeouts.msrc_dss_tcc_us = timeoutMclksToMicroseconds timeouts.msrc_dss_tcc_mclks timeouts.pre_range_vcsel_period_pclks
+
+    PRE_RANGE_CONFIG_TIMEOUT := registers_.read_u16_le PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI
+    timeouts.pre_range_mclks = decodeTimeout PRE_RANGE_CONFIG_TIMEOUT
+
+    timeouts.pre_range_us =timeoutMclksToMicroseconds timeouts.pre_range_mclks timeouts.pre_range_vcsel_period_pclks
+
+    timeouts.final_range_vcsel_period_pclks = getVcselPulsePeriod p.VcselPeriodFinalRange
+
+    FINAL_RANGE_CONFIG_TIMEOUT_MACROP := registers_.read_u16_le FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI
+    timeouts.final_range_mclks = decodeTimeout FINAL_RANGE_CONFIG_TIMEOUT_MACROP
+
+    if enables.pre_range:
+      timeouts.final_range_mclks -= timeouts.pre_range_mclks
+      
+    timeouts.final_range_us = timeoutMclksToMicroseconds timeouts.final_range_mclks timeouts.final_range_vcsel_period_pclks
+
+    return timeouts
 
   /*
-    timeouts->msrc_dss_tcc_mclks = readReg(MSRC_CONFIG_TIMEOUT_MACROP) + 1;
-    timeouts->msrc_dss_tcc_us =
-      timeoutMclksToMicroseconds(timeouts->msrc_dss_tcc_mclks,
-                                timeouts->pre_range_vcsel_period_pclks);
-
-    timeouts->pre_range_mclks =
-      decodeTimeout(readReg16Bit(PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI));
-    timeouts->pre_range_us =
-      timeoutMclksToMicroseconds(timeouts->pre_range_mclks,
-                                timeouts->pre_range_vcsel_period_pclks);
-
-    timeouts->final_range_vcsel_period_pclks = getVcselPulsePeriod(VcselPeriodFinalRange);
-
-    timeouts->final_range_mclks =
-      decodeTimeout(readReg16Bit(FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI));
-
-    if (enables->pre_range)
-    {
-      timeouts->final_range_mclks -= timeouts->pre_range_mclks;
-    }
-
-    timeouts->final_range_us =
-      timeoutMclksToMicroseconds(timeouts->final_range_mclks,
-                                timeouts->final_range_vcsel_period_pclks);
-  }
-
-  // Decode sequence step timeout in MCLKs from register value
-  // based on VL53L0X_decode_timeout()
-  // Note: the original function returned a uint32_t, but the return value is
-  // always stored in a uint16_t.
-  uint16_t VL53L0X::decodeTimeout(uint16_t reg_val)
-  {
-    // format: "(LSByte * 2^MSByte) + 1"
-    return (uint16_t)((reg_val & 0x00FF) <<
-          (uint16_t)((reg_val & 0xFF00) >> 8)) + 1;
-  }
-
   // Encode sequence step timeout register value from timeout in MCLKs
   // based on VL53L0X_encode_timeout()
   uint16_t VL53L0X::encodeTimeout(uint32_t timeout_mclks)
@@ -271,6 +310,18 @@ class LIDARDistanceSensorVL53L0X:
     else { return 0; }
     */
 
+
+
+
+
+  // Decode sequence step timeout in MCLKs from register value
+  // based on VL53L0X_decode_timeout()
+  // Note: the original function returned a uint32_t, but the return value is
+  // always stored in a uint16_t.
+  decodeTimeout reg_val: 
+    // format: "(LSByte * 2^MSByte) + 1"
+    return ((reg_val & 0x00FF) <<
+          ((reg_val & 0xFF00) >> 8)) + 1;
 
   getMeasurementTimingBudget:
     if ENABLE_DEBUG: print "getMeasurementTimingBudget"
@@ -303,16 +354,13 @@ class LIDARDistanceSensorVL53L0X:
       print [enables.tcc, enables.dss, enables.msrc, enables.pre_range, enables.final_range]
 
 
-    timeouts = getSequenceStepTimeouts &enables &timeouts
+    timeouts = getSequenceStepTimeouts enables timeouts
 
     print "USER_NOTE: This is the end.. Work in progress"
 
     return true
 
-    // if (enables.tcc)
-    // {
-    //   budget_us += (timeouts.msrc_dss_tcc_us + TccOverhead);
-    // }
+
 
     // if (enables.dss)
     // {
