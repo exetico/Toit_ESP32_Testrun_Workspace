@@ -224,10 +224,7 @@ class LIDARDistanceSensorVL53L0X:
       return ((timeout_period_mclks * macro_period_ns) + 500) / 1000;
 
 
-  getVcselPulsePeriod vcselPeriodType:
-    print "Things is not working here... How to handle this?"
-    print "https://github.com/pololu/vl53l0x-arduino/blob/9f3773cb48d4e4e844d689cfc529a06f96d1d264/VL53L0X.cpp#L742"
-    
+  getVcselPulsePeriod vcselPeriodType:   
     p /VL53L0X? := null
     p = VL53L0X
 
@@ -322,6 +319,101 @@ class LIDARDistanceSensorVL53L0X:
     // format: "(LSByte * 2^MSByte) + 1"
     return ((reg_val & 0x00FF) <<
           ((reg_val & 0xFF00) >> 8)) + 1;
+
+
+  // Encode sequence step timeout register value from timeout in MCLKs
+  // based on VL53L0X_encode_timeout()
+  encodeTimeout timeout_mclks:
+    // format: "(LSByte * 2^MSByte) + 1"
+    ls_byte := 0; // uint32_t
+    ms_byte := 0; // uint16_t
+
+    if timeout_mclks > 0:
+      ls_byte = timeout_mclks - 1;
+
+      while ((ls_byte & 0xFFFFFF00) > 0):
+        ls_byte >>= 1;
+        ms_byte++;
+      return (ms_byte << 8) | (ls_byte & 0xFF);
+
+    else: return 0
+
+  setMeasurementTimingBudget budget_us:
+    if ENABLE_DEBUG: print "setMeasurementTimingBudget"
+
+    enables := SequenceStepEnables
+    timeouts := SequenceStepTimeouts
+
+    startOverhead     := 1910
+    endOverhead        := 960
+    msrcOverhead       := 660
+    tccOverhead        := 590
+    dssOverhead        := 690
+    preRangeOverhead   := 660
+    finalRangeOverhead := 550
+
+    used_budget_us := startOverhead + endOverhead;
+
+    getSequenceStepEnables enables
+    getSequenceStepTimeouts enables timeouts
+
+    if enables.tcc:
+        used_budget_us += 2 * (timeouts.msrc_dss_tcc_us + tccOverhead);
+
+    if enables.dss:
+        used_budget_us += 2 * (timeouts.msrc_dss_tcc_us + dssOverhead);
+    else if enables.msrc:
+      used_budget_us += (timeouts.msrc_dss_tcc_us + msrcOverhead);
+    
+    
+    if enables.pre_range:
+      used_budget_us += (timeouts.pre_range_us + preRangeOverhead);
+
+    if enables.final_range:
+      used_budget_us += finalRangeOverhead;
+
+      // NOTE_TO_SELF: Consider to take a bit of time to understand why "used_budget_us += finalRangeOverhead;" is used in set, and the other is used in get...
+
+      // "Note that the final range timeout is determined by the timing
+      // budget and the sum of all other timeouts within the sequence.
+      // If there is no room for the final range timeout, then an error
+      // will be set. Otherwise the remaining time will be applied to
+      // the final range."
+
+
+      if used_budget_us > budget_us:
+        // "Requested timeout too big."
+        return false;
+
+      final_range_timeout_us := budget_us - used_budget_us;
+
+      // set_sequence_step_timeout() begin
+      // (SequenceStepId == VL53L0X_SEQUENCESTEP_FINAL_RANGE)
+
+      // "For the final range timeout, the pre-range timeout
+      //  must be added. To do this both final and pre-range
+      //  timeouts must be expressed in macro periods MClks
+      //  because they have different vcsel periods."
+
+      final_range_timeout_mclks := timeoutMicrosecondsToMclks final_range_timeout_us timeouts.final_range_vcsel_period_pclks
+
+      if enables.pre_range:
+        final_range_timeout_mclks += timeouts.pre_range_mclks;
+
+      registers_.write_u16_le FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI (encodeTimeout final_range_timeout_mclks)
+
+      // set_sequence_step_timeout() end
+      measurement_timing_budget_us := budget_us; // store for internal reuse
+    return true;
+
+
+  // Convert sequence step timeout from microseconds to MCLKs with given VCSEL period in PCLKs
+  // based on VL53L0X_calc_timeout_mclks()
+  timeoutMicrosecondsToMclks timeout_period_us vcsel_period_pclks:
+    macro_period_ns := calcMacroPeriod vcsel_period_pclks;
+
+    return (((timeout_period_us * 1000) + (macro_period_ns / 2)) / macro_period_ns);
+
 
   getMeasurementTimingBudget:
     if ENABLE_DEBUG: print "getMeasurementTimingBudget"
@@ -570,7 +662,18 @@ class LIDARDistanceSensorVL53L0X:
 
     measurement_timing_budget_us := getMeasurementTimingBudget
 
+    // "Disable MSRC and TCC by default"
+    // MSRC = Minimum Signal Rate Check
+    // TCC = Target CentreCheck
+    // -- VL53L0X_SetSequenceStepEnable() begin
+    registers_.write_u8 SYSTEM_SEQUENCE_CONFIG 0xE8
 
+    // -- VL53L0X_SetSequenceStepEnable() end
+
+    // "Recalculate timing budget"
+    setMeasurementTimingBudget measurement_timing_budget_us
+
+    print "You're right here... Go fix"
 
 
 
