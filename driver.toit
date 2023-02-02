@@ -3,7 +3,7 @@
 // This is a re-written VL53l0x driver for the To.it language
 // 
 // Therefore I'll give all credits to the original writer of pololu/vl53l0x-arduino
-// For both structure of the code, binary-usage and "how to"
+// For both structure of the code, binary-usage, "how to" and comments in the driver
 
 import binary
 import serial
