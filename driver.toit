@@ -30,6 +30,9 @@ class VL53L0X:
 class LIDARDistanceSensorVL53L0X:
   static I2C_ADDRESS ::= 0x29
 
+
+  static SYSRANGE_START ::= 0x00
+
   static SYSTEM_SEQUENCE_CONFIG ::= 0x01
   static IDENTIFICATION_MODEL_ID ::= 0xC0
   static SYSRANGE_START_::= 0x00
@@ -415,6 +418,22 @@ class LIDARDistanceSensorVL53L0X:
     return (((timeout_period_us * 1000) + (macro_period_ns / 2)) / macro_period_ns);
 
 
+  performSingleRefCalibration vhv_init_byte:
+    registers_.write_u8 SYSRANGE_START (0x01 | vhv_init_byte) // VL53L0X_REG_SYSRANGE_MODE_START_STOP
+
+    startTimeout
+    
+    while (((registers_.read_u8 RESULT_INTERRUPT_STATUS) & 0x07) == 0):
+      if (checkTimeoutExpired):
+        return false
+
+    registers_.write_u8 SYSTEM_INTERRUPT_CLEAR 0x01
+
+    registers_.write_u8 SYSRANGE_START 0x00
+
+    return true;
+
+
   getMeasurementTimingBudget:
     if ENABLE_DEBUG: print "getMeasurementTimingBudget"
 
@@ -679,11 +698,26 @@ class LIDARDistanceSensorVL53L0X:
 
     // -- VL53L0X_perform_vhv_calibration() begin
 
-    print "You're right here... Go fix"
+    registers_.write_u8 SYSTEM_SEQUENCE_CONFIG 0x01
+    if not (performSingleRefCalibration 0x40):
+      return false;
 
+    // -- VL53L0X_perform_vhv_calibration() end
 
+    // -- VL53L0X_perform_phase_calibration() begin
 
-    return true
+    registers_.write_u8 SYSTEM_SEQUENCE_CONFIG 0x02
+    if not (performSingleRefCalibration 0x00):
+      return false;
+
+    // -- VL53L0X_perform_phase_calibration() end
+
+    // "restore the previous Sequence Config"
+    registers_.write_u8 SYSTEM_SEQUENCE_CONFIG 0xE8
+
+    // VL53L0X_PerformRefCalibration() end
+
+    return true;
 
 
   off:
