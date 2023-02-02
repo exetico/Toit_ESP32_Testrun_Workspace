@@ -34,7 +34,13 @@ class LIDARDistanceSensorVL53L0X:
   static SYSRANGE_START ::= 0x00
 
   static SYSTEM_SEQUENCE_CONFIG ::= 0x01
+  static SYSTEM_RANGE_CONFIG ::= 0x09
+  static SYSTEM_INTERMEASUREMENT_PERIOD ::= 0x04
+
   static IDENTIFICATION_MODEL_ID ::= 0xC0
+
+  static OSC_CALIBRATE_VAL ::= 0xF8
+
   static SYSRANGE_START_::= 0x00
   static RESULT_RANGE_STATUS ::= 0x14
   static RESULT_INTERRUPT_STATUS ::= 0x13
@@ -721,7 +727,7 @@ class LIDARDistanceSensorVL53L0X:
 
 
 
-  startContinuous:
+  startContinuous period_ms:
    // Original: https://github.com/pololu/vl53l0x-arduino/blob/9f3773cb48d4e4e844d689cfc529a06f96d1d264/examples/Continuous/Continuous.ino#L28  
 
     registers_.write_u8 0x80 0x01
@@ -732,34 +738,26 @@ class LIDARDistanceSensorVL53L0X:
     registers_.write_u8 0xFF 0x00
     registers_.write_u8 0x80 0x00
 
+    if period_ms != 0:
+      // NOTE_TO_SELF: This needs to be tested?
 
-/*
-    if (period_ms != 0)
-    {
       // continuous timed mode
 
       // VL53L0X_SetInterMeasurementPeriodMilliSeconds() begin
 
-      uint16_t osc_calibrate_val = readReg16Bit(OSC_CALIBRATE_VAL);
+      osc_calibrate_val := registers_.read_u16_le OSC_CALIBRATE_VAL
 
-      if (osc_calibrate_val != 0)
-      {
+      if osc_calibrate_val != 0:
         period_ms *= osc_calibrate_val;
-      }
 
-      writeReg32Bit(SYSTEM_INTERMEASUREMENT_PERIOD, period_ms);
+      registers_.write_u32_le SYSTEM_INTERMEASUREMENT_PERIOD period_ms
 
       // VL53L0X_SetInterMeasurementPeriodMilliSeconds() end
+      registers_.write_u8 SYSRANGE_START 0x04 // VL53L0X_REG_SYSRANGE_MODE_TIMED
 
-      writeReg(SYSRANGE_START, 0x04); // VL53L0X_REG_SYSRANGE_MODE_TIMED
-    }
-    else
-    {
+    else:
       // continuous back-to-back mode
-      writeReg(SYSRANGE_START, 0x02); // VL53L0X_REG_SYSRANGE_MODE_BACKTOBACK
-    }
-*/
-
+      registers_.write_u8 SYSRANGE_START 0x02 // VL53L0X_REG_SYSRANGE_MODE_BACKTOBACK
 
   off:
 
