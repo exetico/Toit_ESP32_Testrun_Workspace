@@ -299,34 +299,6 @@ class LIDARDistanceSensorVL53L0X:
 
     return timeouts
 
-  /*
-  // Encode sequence step timeout register value from timeout in MCLKs
-  // based on VL53L0X_encode_timeout()
-  uint16_t VL53L0X::encodeTimeout(uint32_t timeout_mclks)
-  {
-    // format: "(LSByte * 2^MSByte) + 1"
-
-    uint32_t ls_byte = 0;
-    uint16_t ms_byte = 0;
-
-    if (timeout_mclks > 0)
-    {
-      ls_byte = timeout_mclks - 1;
-
-      while ((ls_byte & 0xFFFFFF00) > 0)
-      {
-        ls_byte >>= 1;
-        ms_byte++;
-      }
-
-      return (ms_byte << 8) | (ls_byte & 0xFF);
-    }
-    else { return 0; }
-    */
-
-
-
-
 
   // Decode sequence step timeout in MCLKs from register value
   // based on VL53L0X_decode_timeout()
