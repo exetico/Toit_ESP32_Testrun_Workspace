@@ -20,4 +20,4 @@ main:
     print distance_sensor.readRangeContinuousMillimeters
     // print "$distance_sensor.horizontal"
         // + "(pressed: $distance_sensor.horizontal)"
-    sleep --ms=500
+    sleep --ms=250
