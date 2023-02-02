@@ -720,6 +720,47 @@ class LIDARDistanceSensorVL53L0X:
     return true;
 
 
+
+  startContinuous:
+   // Original: https://github.com/pololu/vl53l0x-arduino/blob/9f3773cb48d4e4e844d689cfc529a06f96d1d264/examples/Continuous/Continuous.ino#L28  
+
+    registers_.write_u8 0x80 0x01
+    registers_.write_u8 0xFF 0x01
+    registers_.write_u8 0x00 0x00
+    registers_.write_u8 0x91 stop_variable
+    registers_.write_u8 0x00 0x01
+    registers_.write_u8 0xFF 0x00
+    registers_.write_u8 0x80 0x00
+
+
+/*
+    if (period_ms != 0)
+    {
+      // continuous timed mode
+
+      // VL53L0X_SetInterMeasurementPeriodMilliSeconds() begin
+
+      uint16_t osc_calibrate_val = readReg16Bit(OSC_CALIBRATE_VAL);
+
+      if (osc_calibrate_val != 0)
+      {
+        period_ms *= osc_calibrate_val;
+      }
+
+      writeReg32Bit(SYSTEM_INTERMEASUREMENT_PERIOD, period_ms);
+
+      // VL53L0X_SetInterMeasurementPeriodMilliSeconds() end
+
+      writeReg(SYSRANGE_START, 0x04); // VL53L0X_REG_SYSRANGE_MODE_TIMED
+    }
+    else
+    {
+      // continuous back-to-back mode
+      writeReg(SYSRANGE_START, 0x02); // VL53L0X_REG_SYSRANGE_MODE_BACKTOBACK
+    }
+*/
+
+
   off:
 
   /**

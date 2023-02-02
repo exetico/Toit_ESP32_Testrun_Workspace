@@ -13,6 +13,7 @@ main:
   distance_sensor := LIDARDistanceSensorVL53L0X device
 
   distance_sensor.on
+  distance_sensor.startContinuous
   while true:
     print "$distance_sensor.horizontal"
         + "(pressed: $distance_sensor.horizontal)"
